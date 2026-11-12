@@ -1,0 +1,13 @@
+[Unit]
+Description=Minero de Bitcoin (Python, Stratum)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u /opt/btc-miner/miner.py --address TU_DIRECCION_BTC --stats 300
+Restart=always
+RestartSec=15
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panel de Minería BTC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: cabecera con estado del pool, fila de cifras clave, "lotería" (mejor hash vs dificultad), trabajadores, red y calculadora */
+:root {
+  --bg: #f3f4f6; --surface: #ffffff; --line: #dfe2e8; --fg: #1a1f2b; --muted: #5d6576;
+  --accent: #b5652a; --accent-soft: #f6e7da;
+  --ok: #1f8a5b; --warn: #b7791f; --bad: #c0392b;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151c; --surface: #1a1e27; --line: #2b313d; --fg: #e7e9ee; --muted: #9aa2b2;
+  --accent: #e08a4c; --accent-soft: #3a2a1f; --ok: #3fbf86; --warn: #e0a84a; --bad: #ef6b5d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151c; --surface: #1a1e27; --line: #2b313d; --fg: #e7e9ee; --muted: #9aa2b2;
+  --accent: #e08a4c; --accent-soft: #3a2a1f; --ok: #3fbf86; --warn: #e0a84a; --bad: #ef6b5d; color-scheme: dark }
+* { box-sizing: border-box }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px }
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px }
+h1, h2 { font-family: var(--display); margin: 0; text-wrap: balance }
+h1 { font-size: 1.6rem; letter-spacing: -.01em }
+h2 { font-size: 1.05rem }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600 }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
+header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between }
+.brand { display: flex; align-items: center; gap: 12px }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface) }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted) }
+.chip.ok .dot { background: var(--ok) } .chip.warn .dot { background: var(--warn) } .chip.bad .dot { background: var(--bad) }
+form.addr { display: flex; gap: 8px; flex-wrap: wrap; width: 100% }
+input { font: 14px var(--mono); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); min-width: 0 }
+#address { flex: 1 1 320px }
+button { font: 600 14px var(--body); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer }
+button.ghost { background: transparent; color: var(--accent) }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.notice { font-size: .85rem; color: var(--muted); padding: 10px 14px; border: 1px dashed var(--line); border-radius: 8px }
+.notice strong { color: var(--fg) }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px }
+.kpi .v { font: 600 1.45rem var(--mono); font-variant-numeric: tabular-nums }
+.kpi .s { font-size: .8rem; color: var(--muted) }
+section.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0 }
+.lottery { border-color: var(--accent); background: linear-gradient(var(--accent-soft), var(--surface) 70%) }
+.scale { position: relative; height: 14px; border-radius: 7px; background: var(--line); overflow: hidden }
+.scale .fill { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 7px; min-width: 3px }
+.ticks { display: flex; justify-content: space-between; font: .72rem var(--mono); color: var(--muted) }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px }
+.grid-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px }
+.grid-stats div { display: grid; gap: 2px }
+.grid-stats .v { font: 600 1.05rem var(--mono); font-variant-numeric: tabular-nums }
+.table-wrap { overflow-x: auto }
+table { width: 100%; border-collapse: collapse; font-size: .88rem }
+th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line) }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap }
+td.num { text-align: right } th.r { text-align: right }
+.calc { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.calc input { width: 140px }
+footer { font-size: .8rem; color: var(--muted) }
+a { color: var(--accent) }
+@media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) } .two { grid-template-columns: 1fr } }
+@media (prefers-reduced-motion: no-preference) { .scale .fill { transition: width .6s ease } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Panel de Minería BTC</h1>
+      <span class="chip" id="status"><span class="dot"></span><span id="statusText">Cargando…</span></span>
+    </div>
+    <span class="label" id="updated">—</span>
+  </header>
+
+  <form class="addr" id="addrForm">
+    <label class="label" for="address" style="width:100%">Tu dirección de Bitcoin (la misma que pusiste en el minero)</label>
+    <input id="address" placeholder="bc1q…" autocomplete="off" spellcheck="false">
+    <button type="submit">Ver mi minería</button>
+    <button type="button" class="ghost" id="demoBtn">Ver ejemplo</button>
+  </form>
+
+  <div class="notice" id="notice"></div>
+
+  <div class="kpis">
+    <div class="kpi"><span class="label">Tu velocidad</span><span class="v" id="kHash">—</span><span class="s" id="kHashS">suma de tus mineros</span></div>
+    <div class="kpi"><span class="label">Mineros activos</span><span class="v" id="kWorkers">—</span><span class="s" id="kWorkersS">conectados al pool</span></div>
+    <div class="kpi"><span class="label">Mejor hash</span><span class="v" id="kBest">—</span><span class="s">dificultad más alta lograda</span></div>
+    <div class="kpi"><span class="label">Premio por bloque</span><span class="v" id="kReward">3.125 ₿</span><span class="s" id="kRewardS">+ comisiones</span></div>
+  </div>
+
+  <section class="panel lottery">
+    <h2>Tu lotería contra la red</h2>
+    <div class="label">Mejor hash conseguido frente a la dificultad necesaria para ganar un bloque</div>
+    <div class="scale"><div class="fill" id="bestFill" style="width:0%"></div></div>
+    <div class="ticks"><span>0</span><span id="bestPct">—</span><span id="netDiffTick">dificultad de red</span></div>
+    <div class="grid-stats">
+      <div><span class="label">Probabilidad hoy</span><span class="v" id="pDay">—</span></div>
+      <div><span class="label">Probabilidad en un año</span><span class="v" id="pYear">—</span></div>
+      <div><span class="label">Tiempo medio para un bloque</span><span class="v" id="tBlock">—</span></div>
+      <div><span class="label">Tu parte de la red</span><span class="v" id="share">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Mineros</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nombre</th><th>Estado</th><th class="r">Velocidad</th><th class="r">Mejor hash</th><th class="r">Conectado desde</th></tr></thead>
+        <tbody id="workers"><tr><td colspan="5">Sin datos todavía.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="two">
+    <section class="panel">
+      <h2>Red de Bitcoin</h2>
+      <div class="grid-stats">
+        <div><span class="label">Altura de bloque</span><span class="v" id="nHeight">—</span></div>
+        <div><span class="label">Velocidad de la red</span><span class="v" id="nHash">—</span></div>
+        <div><span class="label">Dificultad</span><span class="v" id="nDiff">—</span></div>
+        <div><span class="label">Precio</span><span class="v" id="nPrice">—</span></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Calculadora</h2>
+      <div class="calc">
+        <label class="label" for="calcHash">Velocidad en TH/s</label>
+        <input id="calcHash" type="number" min="0" step="any" value="1.2">
+      </div>
+      <div class="label">Referencias: Bitaxe ≈ 1.2 TH/s · Antminer S21 ≈ 200 TH/s · CPU con el script ≈ 0.00001 TH/s</div>
+      <div class="grid-stats">
+        <div><span class="label">Probabilidad al día</span><span class="v" id="cDay">—</span></div>
+        <div><span class="label">Tiempo medio para un bloque</span><span class="v" id="cBlock">—</span></div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    Datos del pool: <a href="https://web.public-pool.io" target="_blank" rel="noopener">public-pool.io</a> (minería solo, apunta tu minero a <span class="num">public-pool.io:21496</span> con tu dirección como usuario).
+    Datos de red: <a href="https://mempool.space" target="_blank" rel="noopener">mempool.space</a>. Se actualiza cada minuto.
+  </footer>
+</div>
+
+<script>
+const POOL_API = "https://public-pool.io:40557/api/client/";
+const MEMPOOL = "https://mempool.space/api";
+const REWARD = 3.125;
+const $ = id => document.getElementById(id);
+const store = { get(k){ try { return localStorage.getItem(k) } catch { return null } }, set(k,v){ try { localStorage.setItem(k,v) } catch {} } };
+
+const DEMO = {
+  network: { height: 924310, hashrate: 1.05e21, difficulty: 1.46e14, price: 98000 },
+  client: { bestDifficulty: 2.31e9, workers: [
+    { name: "bitaxe-salon", hashRate: 1.21e12, bestDifficulty: 2.31e9, startTime: Date.now() - 6.5*864e5, lastSeen: Date.now() - 20e3 },
+    { name: "bitaxe-oficina", hashRate: 1.09e12, bestDifficulty: 8.7e8, startTime: Date.now() - 2.1*864e5, lastSeen: Date.now() - 45e3 },
+    { name: "alquilado-nh", hashRate: 0, bestDifficulty: 4.4e8, startTime: Date.now() - 9*864e5, lastSeen: Date.now() - 3*36e5 } ] }
+};
+
+let state = { network: null, client: null, demo: false, address: store.get("btcAddress") || "" };
+
+function unit(v, units, base = 1000) { let i = 0; while (v >= base && i < units.length - 1) { v /= base; i++ } return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : v.toFixed(0)) + " " + units[i]; }
+const fmtHash = h => unit(h, ["H/s","kH/s","MH/s","GH/s","TH/s","PH/s","EH/s","ZH/s"]);
+const fmtDiff = d => unit(d, ["","K","M","G","T","P","E"]).trim();
+function fmtProb(p) { if (!isFinite(p) || p <= 0) return "0 %"; if (p >= 0.01) return (p*100).toFixed(2) + " %"; const n = Math.round(1/p); return "1 entre " + n.toLocaleString("es-ES"); }
+function fmtDuration(s) { if (!isFinite(s)) return "nunca"; const d = s/86400; if (d < 1) return (s/3600).toFixed(1) + " horas"; if (d < 365) return d.toFixed(0) + " días"; const y = d/365; return y < 1e6 ? Math.round(y).toLocaleString("es-ES") + " años" : y.toExponential(1).replace("e+", "×10^") + " años"; }
+function ago(t) { const s = (Date.now() - t)/1000; if (s < 90) return "hace " + Math.round(s) + " s"; if (s < 5400) return "hace " + Math.round(s/60) + " min"; if (s < 172800) return "hace " + Math.round(s/3600) + " h"; return "hace " + Math.round(s/86400) + " días"; }
+function odds(hashrate, difficulty) {
+  const secsPerBlock = difficulty * 4294967296 / hashrate;
+  return { secsPerBlock, pDay: 1 - Math.exp(-86400/secsPerBlock), pYear: 1 - Math.exp(-31536000/secsPerBlock) };
+}
+function setStatus(kind, text) { $("status").className = "chip " + kind; $("statusText").textContent = text; }
+
+async function getJSON(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(r.status + " " + url); return r.json(); }
+
+async function loadNetwork() {
+  const [hr, height, prices] = await Promise.all([
+    getJSON(MEMPOOL + "/v1/mining/hashrate/3d"),
+    fetch(MEMPOOL + "/blocks/tip/height").then(r => r.text()),
+    getJSON(MEMPOOL + "/v1/prices").catch(() => ({}))
+  ]);
+  return { height: Number(height), hashrate: Number(hr.currentHashrate), difficulty: Number(hr.currentDifficulty), price: prices.USD || null };
+}
+async function loadClient(addr) {
+  const j = await getJSON(POOL_API + encodeURIComponent(addr));
+  return { bestDifficulty: Number(j.bestDifficulty) || 0,
+    workers: (j.workers || []).map(w => ({ name: w.name || "sin nombre", hashRate: Number(w.hashRate) || 0, bestDifficulty: Number(w.bestDifficulty) || 0,
+      startTime: new Date(w.startTime).getTime(), lastSeen: new Date(w.lastSeen).getTime() })) };
+}
+
+async function refresh() {
+  if (state.demo || !state.address) { state.network = DEMO.network; state.client = DEMO.client; state.demo = true; render(); return; }
+  setStatus("", "Actualizando…");
+  try { state.network = await loadNetwork(); } catch (e) { console.warn(e); }
+  try { state.client = await loadClient(state.address); render(); }
+  catch (e) { console.warn(e); state.client = null; render("No se pudo leer el pool para esta dirección. Comprueba que tu minero esté apuntando a public-pool.io:21496 con esta dirección, o que el pool responda."); }
+}
+
+function render(error) {
+  const n = state.network, c = state.client;
+  const notice = $("notice");
+  if (state.demo) { notice.innerHTML = "<strong>Datos de ejemplo.</strong> Así se ve el panel con dos Bitaxe y un minero alquilado. Escribe tu dirección arriba para ver los tuyos."; setStatus("warn", "Ejemplo"); }
+  else if (error) { notice.textContent = error; setStatus("bad", "Sin conexión con el pool"); }
+  else { notice.innerHTML = "Mostrando la dirección <span class='num'></span>"; notice.querySelector("span").textContent = state.address; }
+
+  if (n) {
+    $("nHeight").textContent = n.height ? n.height.toLocaleString("es-ES") : "—";
+    $("nHash").textContent = n.hashrate ? fmtHash(n.hashrate) : "—";
+    $("nDiff").textContent = n.difficulty ? fmtDiff(n.difficulty) : "—";
+    $("nPrice").textContent = n.price ? "$" + Math.round(n.price).toLocaleString("es-ES") : "—";
+    $("kRewardS").textContent = n.price ? "≈ $" + Math.round(REWARD * n.price).toLocaleString("es-ES") + " + comisiones" : "+ comisiones";
+    $("netDiffTick").textContent = n.difficulty ? fmtDiff(n.difficulty) : "dificultad de red";
+  }
+  calc();
+  if (!c) return;
+
+  const online = c.workers.filter(w => Date.now() - w.lastSeen < 5*60e3);
+  const total = online.reduce((s, w) => s + w.hashRate, 0);
+  $("kHash").textContent = fmtHash(total);
+  $("kWorkers").textContent = online.length + " / " + c.workers.length;
+  $("kWorkersS").textContent = c.workers.length - online.length ? (c.workers.length - online.length) + " sin conexión" : "todos conectados";
+  $("kBest").textContent = fmtDiff(c.bestDifficulty);
+  if (!state.demo && !error) setStatus(online.length ? "ok" : "bad", online.length ? "Minando" : "Ningún minero activo");
+
+  if (n && n.difficulty) {
+    const pct = c.bestDifficulty / n.difficulty * 100;
+    $("bestFill").style.width = Math.min(100, Math.max(pct, 0.3)) + "%";
+    $("bestPct").textContent = pct >= 100 ? "¡Bloque!" : (pct < 0.01 ? pct.toExponential(1) : pct.toFixed(3)) + " % del camino";
+    const o = odds(total, n.difficulty);
+    $("pDay").textContent = total ? fmtProb(o.pDay) : "0 %";
+    $("pYear").textContent = total ? fmtProb(o.pYear) : "0 %";
+    $("tBlock").textContent = total ? fmtDuration(o.secsPerBlock) : "nunca";
+    $("share").textContent = total && n.hashrate ? (total / n.hashrate * 100).toExponential(2) + " %" : "—";
+  }
+
+  const tb = $("workers"); tb.textContent = "";
+  if (!c.workers.length) { tb.innerHTML = "<tr><td colspan='5'>No hay mineros conectados con esta dirección.</td></tr>"; }
+  for (const w of [...c.workers].sort((a, b) => b.hashRate - a.hashRate)) {
+    const on = Date.now() - w.lastSeen < 5*60e3;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td></td><td><span class="chip ${on ? "ok" : "bad"}"><span class="dot"></span>${on ? "Activo" : "Visto " + ago(w.lastSeen)}</span></td><td class="num"></td><td class="num"></td><td class="num"></td>`;
+    tr.children[0].textContent = w.name;
+    tr.children[2].textContent = fmtHash(w.hashRate);
+    tr.children[3].textContent = fmtDiff(w.bestDifficulty);
+    tr.children[4].textContent = ago(w.startTime);
+    tb.appendChild(tr);
+  }
+  $("updated").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES");
+}
+
+function calc() {
+  const th = parseFloat($("calcHash").value), d = state.network && state.network.difficulty;
+  if (!th || !d) { $("cDay").textContent = "—"; $("cBlock").textContent = "—"; return; }
+  const o = odds(th * 1e12, d);
+  $("cDay").textContent = fmtProb(o.pDay); $("cBlock").textContent = fmtDuration(o.secsPerBlock);
+}
+
+$("calcHash").addEventListener("input", calc);
+$("addrForm").addEventListener("submit", e => { e.preventDefault(); const a = $("address").value.trim(); if (!a) return; state.address = a; state.demo = false; store.set("btcAddress", a); refresh(); });
+$("demoBtn").addEventListener("click", () => { state.demo = true; refresh(); });
+$("address").value = state.address;
+state.demo = !state.address;
+refresh();
+setInterval(() => { if (!state.demo) refresh(); }, 60e3);
+</script>
+</body>
+</html>
