@@ -226,14 +226,14 @@ function render(error) {
   const total = online.reduce((s, w) => s + w.hashRate, 0);
   $("kHash").textContent = fmtHash(total);
   $("kWorkers").textContent = online.length + " / " + c.workers.length;
-  $("kWorkersS").textContent = c.workers.length - online.length ? (c.workers.length - online.length) + " sin conexión" : "todos conectados";
-  $("kBest").textContent = fmtDiff(c.bestDifficulty);
+  $("kWorkersS").textContent = !c.workers.length ? "conecta tu primer minero" : c.workers.length - online.length ? (c.workers.length - online.length) + " sin conexión" : "todos conectados";
+  $("kBest").textContent = c.bestDifficulty ? fmtDiff(c.bestDifficulty) : "—";
   if (!state.demo && !error) setStatus(online.length ? "ok" : "bad", online.length ? "Minando" : "Ningún minero activo");
 
   if (n && n.difficulty) {
     const pct = c.bestDifficulty / n.difficulty * 100;
     $("bestFill").style.width = Math.min(100, Math.max(pct, 0.3)) + "%";
-    $("bestPct").textContent = pct >= 100 ? "¡Bloque!" : (pct < 0.01 ? pct.toExponential(1) : pct.toFixed(3)) + " % del camino";
+    $("bestPct").textContent = !pct ? "aún sin hashes" : pct >= 100 ? "¡Bloque!" : (pct < 0.01 ? pct.toExponential(1) : pct.toFixed(3)) + " % del camino";
     const o = odds(total, n.difficulty);
     $("pDay").textContent = total ? fmtProb(o.pDay) : "0 %";
     $("pYear").textContent = total ? fmtProb(o.pYear) : "0 %";
