@@ -1,0 +1,2 @@
+anthropic==2.9.0
+binance-connector==3.13.0

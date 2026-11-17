@@ -1,0 +1,10 @@
+{
+  "modo": "pruebas",
+  "simbolos_permitidos": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+  "capital_usdt": 100,
+  "max_por_operacion_usdt": 25,
+  "perdida_max_dia_usdt": 10,
+  "max_operaciones_dia": 6,
+  "stop_min_pct": 0.8,
+  "stop_max_pct": 6
+}
